@@ -276,6 +276,8 @@ multicastpeergroups_cache = []
 radii_cache = []
 multicastsourcesiteconfigs_cache = []
 hubclusters_cache = []
+vrfcontexts_cache = []
+vrfcontextprofiles_cache = []
 
 # Most items need Name to ID maps.
 sites_n2id = {}
@@ -312,6 +314,8 @@ ipfixglobalprefix_n2id = {}
 apnprofiles_n2id = {}
 multicastpeergroups_n2id = {}
 radii_n2id = {}
+vrfcontexts_n2id = {}
+vrfcontextprofiles_n2id = {}
 
 
 # Machines/elements need serial to ID mappings
@@ -489,6 +493,8 @@ def update_global_cache():
     global radii_cache
     global multicastsourcesiteconfigs_cache
     global hubclusters_cache
+    global vrfcontexts_cache
+    global vrfcontextprofiles_cache
 
     global sites_n2id
     global elements_n2id
@@ -524,6 +530,8 @@ def update_global_cache():
     global apnprofiles_n2id
     global multicastpeergroups_n2id
     global radii_n2id
+    global vrfcontexts_n2id
+    global vrfcontextprofiles_n2id
 
     global elements_byserial
     global machines_byserial
@@ -664,6 +672,12 @@ def update_global_cache():
     multicastpeergroups_resp = sdk.get.multicastpeergroups()
     multicastpeergroups_cache, _ = extract_items(multicastpeergroups_resp, 'multicastpeergroups')
 
+    vrfcontexts_resp = sdk.get.vrfcontexts()
+    vrfcontexts_cache, _ = extract_items(vrfcontexts_resp, "vrfcontexts")
+
+    vrfcontextprfiles_resp = sdk.get.vrfcontextprofiles()
+    vrfcontextprofiles_cache, _ = extract_items(vrfcontextprfiles_resp, "vrfcontextprofiles")
+
     # sites name
     sites_n2id = build_lookup_dict(sites_cache)
 
@@ -762,6 +776,10 @@ def update_global_cache():
 
     # multicastpeergroups name
     multicastpeergroups_n2id = build_lookup_dict(multicastpeergroups_cache)
+
+    vrfcontexts_n2id = build_lookup_dict(vrfcontexts_cache)
+
+    vrfcontextprofiles_n2id = build_lookup_dict(vrfcontextprofiles_cache)
 
     # element by serial
     elements_byserial = list_to_named_key_value(elements_cache, 'serial_number', pop_index=False)
@@ -2153,6 +2171,7 @@ def create_site(config_site, version=None):
     name_lookup_in_template(site_template, 'priority_policysetstack_id', priority_policysetstack_n2id)
     name_lookup_in_template(site_template, 'nat_policysetstack_id', natpolicysetstacks_n2id)
     name_lookup_in_template(site_template, 'service_binding', servicebindingmaps_n2id)
+    name_lookup_in_template(site_template, 'vrf_context_profile_id', vrfcontextprofiles_n2id)
 
     local_debug("SITE TEMPLATE: " + str(json.dumps(site_template, indent=4)))
 
@@ -2212,6 +2231,7 @@ def modify_site(config_site, site_id, version=None):
     name_lookup_in_template(site_template, 'priority_policysetstack_id', priority_policysetstack_n2id)
     name_lookup_in_template(site_template, 'nat_policysetstack_id', natpolicysetstacks_n2id)
     name_lookup_in_template(site_template, 'service_binding', servicebindingmaps_n2id)
+    name_lookup_in_template(site_template, 'vrf_context_profile_id', vrfcontextprofiles_n2id)
 
     local_debug("SITE TEMPLATE: " + str(json.dumps(site_template, indent=4)))
 
@@ -2569,6 +2589,7 @@ def create_lannetwork(config_lannetwork, lannetworks_n2id, site_id, version=None
     # perform name -> ID lookups
     name_lookup_in_template(lannetwork_template, 'security_policy_set', security_policysets_n2id)
     name_lookup_in_template(lannetwork_template, 'network_context_id', networkcontexts_n2id)
+    name_lookup_in_template(lannetwork_template, 'vrf_context_id', vrfcontexts_n2id)
 
     local_debug("LANNETWORK TEMPLATE: " + str(json.dumps(lannetwork_template, indent=4)))
 
@@ -2609,6 +2630,7 @@ def modify_lannetwork(config_lannetwork, lannetwork_id, lannetworks_n2id, site_i
     # perform name -> ID lookups
     name_lookup_in_template(lannetwork_template, 'security_policy_set', security_policysets_n2id)
     name_lookup_in_template(lannetwork_template, 'network_context_id', networkcontexts_n2id)
+    name_lookup_in_template(lannetwork_template, 'vrf_context_id', vrfcontexts_n2id)
 
     local_debug("LANNETWORK TEMPLATE: " + str(json.dumps(lannetwork_template, indent=4)))
 
@@ -2695,6 +2717,7 @@ def create_dhcpserver(config_dhcpserver, site_id, version=None):
 
     # replace flat names
     name_lookup_in_template(dhcpserver_template, 'network_context_id', networkcontexts_n2id)
+    name_lookup_in_template(dhcpserver_template, 'vrf_context_id', vrfcontexts_n2id)
 
     local_debug("DHCPSERVER TEMPLATE: " + str(json.dumps(dhcpserver_template, indent=4)))
 
@@ -2729,6 +2752,7 @@ def modify_dhcpserver(config_dhcpserver, dhcpserver_id, site_id, version=None):
 
     # replace flat names
     name_lookup_in_template(dhcpserver_template, 'network_context_id', networkcontexts_n2id)
+    name_lookup_in_template(dhcpserver_template, 'vrf_context_id', vrfcontexts_n2id)
 
     local_debug("DHCPSERVER TEMPLATE: " + str(json.dumps(dhcpserver_template, indent=4)))
 
@@ -4094,6 +4118,7 @@ def create_interface(config_interface, interfaces_n2id, waninterfaces_n2id, lann
     name_lookup_in_template(interface_template, 'ipfixcollectorcontext_id', ipfixcollectorcontext_n2id)
     name_lookup_in_template(interface_template, 'ipfixfiltercontext_id', ipfixfiltercontext_n2id)
     name_lookup_in_template(interface_template, 'network_context_id', networkcontexts_n2id)
+    name_lookup_in_template(interface_template, 'vrf_context_id', vrfcontexts_n2id)
 
     # check for namable interfaces
     interface_template_name = interface_template.get('name')
@@ -4429,6 +4454,7 @@ def modify_interface(config_interface, interface_id, interfaces_n2id, waninterfa
     name_lookup_in_template(interface_template, 'ipfixcollectorcontext_id', ipfixcollectorcontext_n2id)
     name_lookup_in_template(interface_template, 'ipfixfiltercontext_id', ipfixfiltercontext_n2id)
     name_lookup_in_template(interface_template, 'network_context_id', networkcontexts_n2id)
+    name_lookup_in_template(interface_template, 'vrf_context_id', vrfcontexts_n2id)
 
     # check for namable interfaces
     interface_template_name = interface_template.get('name')
@@ -5064,6 +5090,7 @@ def create_staticroute(config_staticroute, interfaces_n2id, site_id, element_id,
 
     # replace flat names
     name_lookup_in_template(staticroute_template, 'network_context_id', networkcontexts_n2id)
+    name_lookup_in_template(staticroute_template, 'vrf_context_id', vrfcontexts_n2id)
 
     local_debug("STATICROUTE TEMPLATE: " + str(json.dumps(staticroute_template, indent=4)))
 
@@ -5131,6 +5158,7 @@ def modify_staticroute(config_staticroute, staticroute_id, interfaces_n2id,
 
     # replace flat names
     name_lookup_in_template(staticroute_template, 'network_context_id', networkcontexts_n2id)
+    name_lookup_in_template(staticroute_template, 'vrf_context_id', vrfcontexts_n2id)
 
     local_debug("STATICROUTE TEMPLATE: " + str(json.dumps(staticroute_template, indent=4)))
 
@@ -5884,6 +5912,7 @@ def create_bgp_peer(config_bgp_peer, bgp_peer_n2id, routemaps_n2id, site_id, ele
         name_lookup_in_template(bgp_peer_template, 'route_map_in_id', routemaps_n2id)
         name_lookup_in_template(bgp_peer_template, 'route_map_out_id', routemaps_n2id)
 
+    name_lookup_in_template(bgp_peer_template, 'vrf_context_id', vrfcontexts_n2id)
     local_debug("bgp_peer TEMPLATE: " + str(json.dumps(bgp_peer_template, indent=4)))
 
     # create bgp_peer
@@ -5924,6 +5953,7 @@ def modify_bgp_peer(config_bgp_peer, bgp_peer_id, bgp_peer_n2id, routemaps_n2id,
     # replace flat names
     name_lookup_in_template(bgp_peer_template, 'route_map_in_id', routemaps_n2id)
     name_lookup_in_template(bgp_peer_template, 'route_map_out_id', routemaps_n2id)
+    name_lookup_in_template(bgp_peer_template, 'vrf_context_id', vrfcontexts_n2id)
 
     local_debug("bgp_peer TEMPLATE: " + str(json.dumps(bgp_peer_template, indent=4)))
 
