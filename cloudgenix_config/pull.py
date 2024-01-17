@@ -171,6 +171,7 @@ MULTICASTSOURCESITECONFIGS_STR = "multicastsourcesiteconfigs"
 DEVICE_ID_CONFIGS_STR = "deviceidconfigs"
 SNMPDISCOVERY_STR = "snmpdiscoverystartnodes"
 ELEMENT_DEVICEIDCONFIGS_STR = "element_deviceidconfigs"
+BIND_HUBCLUSTER_CONFIG_STR = "bind_hubclusters"
 
 # Global Config Cache holders
 sites_cache = []
@@ -660,6 +661,7 @@ def build_version_strings():
     global DEVICE_ID_CONFIGS_STR
     global SNMPDISCOVERY_STR
     global ELEMENT_DEVICEIDCONFIGS_STR
+    global BIND_HUBCLUSTER_CONFIG_STR
 
     if not STRIP_VERSIONS:
         # Config container strings
@@ -704,6 +706,7 @@ def build_version_strings():
         DEVICE_ID_CONFIGS_STR = add_version_to_object(sdk.get.deviceidconfigs, "deviceidconfigs")
         SNMPDISCOVERY_STR = add_version_to_object(sdk.get.deviceidconfigs_snmpdiscoverystartnodes, "snmpdiscoverystartnodes")
         ELEMENT_DEVICEIDCONFIGS_STR = add_version_to_object(sdk.get.element_deviceidconfigs, "element_deviceidconfigs")
+        BIND_HUBCLUSTER_CONFIG_STR = add_version_to_object(sdk.get.hubclusters, "bind_hubclusters")
 
 
 def strip_meta_attributes(obj, leave_name=False, report_id=None):
@@ -882,6 +885,20 @@ def _pull_config_for_single_site(site_name_id):
         site[HUBCLUSTER_CONFIG_STR][checked_hubcluster_name] = hubcluster_template
     delete_if_empty(site, HUBCLUSTER_CONFIG_STR)
 
+    site[BIND_HUBCLUSTER_CONFIG_STR] = []
+    for site_h in SITES:
+        if site_h.get("element_cluster_role") == "HUB":
+            response = sdk.get.hubclusters(site_h['id'])
+            if not response.cgx_status:
+                throw_error("Hub Clusters get failed: ", response)
+            hubclusters = response.cgx_content['items']
+            for hubcluster in hubclusters:
+                if hubcluster.get("peer_sites") and site["id"] in hubcluster["peer_sites"]:
+                    association_dict = {site_h.get("name", site_h['id']): hubcluster.get("name", hubcluster["id"])}
+                    site[BIND_HUBCLUSTER_CONFIG_STR].append(association_dict)
+                else:
+                    association_dict = {site_h.get("name", site_h['id']): "No cluster"}
+                    site[BIND_HUBCLUSTER_CONFIG_STR].append(association_dict)
     # Get Spoke Clusters
     dup_name_dict = {}
     site[SPOKECLUSTER_CONFIG_STR] = {}
