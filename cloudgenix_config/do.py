@@ -952,10 +952,13 @@ def parse_site_config(config_site):
                                                                     sdk.put.hubclusters, default={})
     config_deviceidconfigs, _ = config_lower_version_get(config_site, 'deviceidconfigs',
                                                                     sdk.put.deviceidconfigs, default={})
+    config_bind_hubclusters, _ = config_lower_version_get(config_site, 'bind_hubclusters',
+                                                     sdk.put.hubclusters, default={})
 
     return config_waninterfaces, config_lannetworks, config_elements, config_dhcpservers, config_site_extensions, \
         config_site_security_zones, config_spokeclusters, config_site_nat_localprefixes, \
-        config_site_ipfix_localprefixes, config_multicastsourcesiteconfigs, config_hubclusters, config_deviceidconfigs
+        config_site_ipfix_localprefixes, config_multicastsourcesiteconfigs, config_hubclusters, config_deviceidconfigs, \
+           config_bind_hubclusters
 
 
 def parse_element_config(config_element):
@@ -2374,7 +2377,7 @@ def modify_site(config_site, site_id, version=None):
             site_name = site_change_check.get('name')
             config_waninterfaces, config_lannetworks, config_elements, config_dhcpservers, config_site_extensions, \
             config_site_security_zones, config_spokeclusters, config_site_nat_localprefixes, config_site_ipfix_localprefixes, \
-            config_multicastsourcesiteconfigs, config_hubclusters, config_deviceidconfigs = parse_site_config(config_site)
+            config_multicastsourcesiteconfigs, config_hubclusters, config_deviceidconfigs, config_bind_hubclusters = parse_site_config(config_site)
 
             if not config_multicastsourcesiteconfigs:
                 output_message(" Resetting Multicast Source Site Config for the Site {0}.".format(site_name))
@@ -8121,7 +8124,7 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
             # parse site config
             config_waninterfaces, config_lannetworks, config_elements, config_dhcpservers, config_site_extensions, \
                 config_site_security_zones, config_spokeclusters, config_site_nat_localprefixes, config_site_ipfix_localprefixes, \
-                config_multicastsourcesiteconfigs, config_hubclusters, config_deviceidconfigs \
+                config_multicastsourcesiteconfigs, config_hubclusters, config_deviceidconfigs, config_bind_hubclusters \
                 = parse_site_config(config_site)
 
             # Getting version for site resourcesinput apiversion
@@ -8149,6 +8152,10 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
                                                                       sdk_or_yaml=apiversion)
             deviceidconfigs_version = use_sdk_yaml_version(config_site, 'deviceidconfigs',
                                                        sdk.put.deviceidconfigs, default=[],
+                                                       sdk_or_yaml=apiversion)
+
+            bind_hubclusters_version = use_sdk_yaml_version(config_site, 'hubclusters',
+                                                       sdk.put.hubclusters, default=[],
                                                        sdk_or_yaml=apiversion)
 
             if "multicast_peer_group_id" in config_site and config_site["multicast_peer_group_id"]:
@@ -8504,7 +8511,71 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
                 leftover_hubclusters = [entry for entry in leftover_hubclusters if entry != hubcluster_id]
 
             # -- End HubClusters
+            """
+            # First get hubclusters... Second identify if hubcluster is changed.. third remove existing.. fourth update new
+            for hub_data in config_bind_hubclusters:
+                for hub_site, hubcluster_name in hub_data.items():
+                    hub_site_id = sites_n2id.get(hub_site, hub_site)
+                    hubclusters_resp = sdk.get.hubclusters(hub_site_id)
+                    hubclusters_cache, leftover_hubclusters = extract_items(hubclusters_resp, 'hubclusters')
+                    hubclusters_n2id = build_lookup_dict(hubclusters_cache)
+                    hubcluster_id = hubclusters_n2id.get(hubcluster_name)
 
+                    for hub_cluster in hubclusters_cache:
+                        hub_cluster_template = copy.deepcopy(hub_cluster)
+                        peer_sites = hub_cluster.get("peer_sites")
+                        new_peer_sites = copy.deepcopy(peer_sites)
+                        if peer_sites:
+                            if site_id in peer_sites:
+                                if hubcluster_id == hub_cluster.get("id"):
+                                    output_message("  No change in cluster binding")
+                                else:
+                                    new_peer_sites.remove(site_id)
+                                    hub_cluster_template["peer_sites"] = new_peer_sites
+                                    sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"), hub_cluster_template)
+                        #     else:
+                        #         if hubcluster_id == hub_cluster.get("id"):
+                        #             new_peer_sites.append(site_id)
+                        #             hub_cluster_template["peer_sites"] = new_peer_sites
+                        #             sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"), hub_cluster_template)
+                        #         elif not hubcluster_id:
+                        #             output_message("  No change in cluster binding")
+                        # else:
+                        #     if not hubcluster_id:
+                        #         output_message("  No change in cluster binding")
+                        #     elif hubcluster_id == hub_cluster.get("id"):
+                        #         new_peer_sites.append(site_id)
+                        #         hub_cluster_template["peer_sites"] = new_peer_sites
+                        #         sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"), hub_cluster_template)
+
+                    # Now that we have removed. We need to update the clusters with new values
+                    for hub_cluster in hubclusters_cache:
+                        hub_cluster_template = copy.deepcopy(hub_cluster)
+                        peer_sites = hub_cluster.get("peer_sites")
+                        new_peer_sites = copy.deepcopy(peer_sites)
+                        if peer_sites:
+                            if site_id in peer_sites:
+                                if hubcluster_id == hub_cluster.get("id"):
+                                    output_message("  No change in cluster binding")
+                                else:
+                                    new_peer_sites.remove(site_id)
+                                    hub_cluster_template["peer_sites"] = new_peer_sites
+                                    sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"), hub_cluster_template)
+                            else:
+                                if hubcluster_id == hub_cluster.get("id"):
+                                    new_peer_sites.append(site_id)
+                                    hub_cluster_template["peer_sites"] = new_peer_sites
+                                    sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"), hub_cluster_template)
+                                elif not hubcluster_id:
+                                    output_message("  No change in cluster binding")
+                        else:
+                            if not hubcluster_id:
+                                output_message("  No change in cluster binding")
+                            elif hubcluster_id == hub_cluster.get("id"):
+                                new_peer_sites.append(site_id)
+                                hub_cluster_template["peer_sites"] = new_peer_sites
+                                sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"), hub_cluster_template)
+            """
             # -- Start Site_extensions
             site_extensions_resp = sdk.get.site_extensions(site_id)
             site_extensions_cache, leftover_site_extensions = extract_items(site_extensions_resp,
