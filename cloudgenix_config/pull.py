@@ -895,9 +895,13 @@ def _pull_config_for_single_site(site_name_id):
             association_dict = {}
             for hubcluster in hubclusters:
                 if hubcluster.get("peer_sites") and site["id"] in hubcluster["peer_sites"]:
-                    association_dict = {site_h.get("name", site_h['id']): hubcluster.get("name", hubcluster["id"])}
-                else:
-                    association_dict = {site_h.get("name", site_h['id']): "No cluster"}
+                    default = ""
+                    if hubcluster.get("default_cluster"):
+                        default = "(default)"
+                    association_dict = {site_h.get("name", site_h['id']): hubcluster.get("name", hubcluster["id"]) + default}
+                    break
+            if not association_dict:
+                association_dict = {site_h.get("name", site_h['id']): "No cluster"}
 
             site[BIND_HUBCLUSTER_CONFIG_STR].append(association_dict)
     # Get Spoke Clusters
