@@ -892,13 +892,14 @@ def _pull_config_for_single_site(site_name_id):
             if not response.cgx_status:
                 throw_error("Hub Clusters get failed: ", response)
             hubclusters = response.cgx_content['items']
+            association_dict = {}
             for hubcluster in hubclusters:
                 if hubcluster.get("peer_sites") and site["id"] in hubcluster["peer_sites"]:
                     association_dict = {site_h.get("name", site_h['id']): hubcluster.get("name", hubcluster["id"])}
-                    site[BIND_HUBCLUSTER_CONFIG_STR].append(association_dict)
                 else:
                     association_dict = {site_h.get("name", site_h['id']): "No cluster"}
-                    site[BIND_HUBCLUSTER_CONFIG_STR].append(association_dict)
+
+            site[BIND_HUBCLUSTER_CONFIG_STR].append(association_dict)
     # Get Spoke Clusters
     dup_name_dict = {}
     site[SPOKECLUSTER_CONFIG_STR] = {}
