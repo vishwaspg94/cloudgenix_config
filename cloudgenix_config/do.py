@@ -8194,6 +8194,92 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
                 new_site_id = site_id
             # -- End Sites
 
+            # First get hubclusters...Second identify if hubcluster is changed..Third remove existing..fourth update new
+            output_message(" Validating Hub Cluster binding")
+            for hub_data in config_bind_hubclusters:
+                for hub_site, hubcluster_name in hub_data.items():
+                    if hubcluster_name:
+                        hubcluster_name = re.sub(r"\(.+\)", "", hubcluster_name)
+                    hub_site_id = sites_n2id.get(hub_site, hub_site)
+                    hubclusters_resp = sdk.get.hubclusters(hub_site_id)
+                    hubclusters_cache, _ = extract_items(hubclusters_resp, 'hubclusters')
+                    hubclusters_n2id = build_lookup_dict(hubclusters_cache)
+                    hubcluster_id = None
+                    if hubcluster_name:
+                        if re.match(r"No cluster", hubcluster_name, re.I):
+                            hubcluster_id = None
+                        else:
+                            hubcluster_id = hubclusters_n2id.get(hubcluster_name)
+                            if not hubcluster_id:
+                                throw_warning(
+                                    "Invalid hubcluster name '{0}' for DC '{1}'. Skipping..".format(hubcluster_name, hub_site))
+                                continue
+
+                    for hub_cluster in hubclusters_cache:
+                        hub_cluster_template = copy.deepcopy(hub_cluster)
+                        peer_sites = hub_cluster.get("peer_sites")
+                        new_peer_sites = copy.deepcopy(peer_sites)
+                        if peer_sites:
+                            if site_id in peer_sites:
+                                if hubcluster_id == hub_cluster.get("id"):
+                                    continue
+                                else:
+                                    new_peer_sites.remove(site_id)
+                                    hub_cluster_template["peer_sites"] = new_peer_sites
+                                    resp = sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"),
+                                                               hub_cluster_template)
+                                    if not resp.cgx_status:
+                                        throw_error("Hubcluster update failed: ", resp)
+                                    output_message(
+                                        " Updated site '{0}' as part of cluster '{1}' for DC '{2}'".format(
+                                            config_site_name,
+                                            hubcluster_name,
+                                            hub_site))
+
+            for hub_data in config_bind_hubclusters:
+                for hub_site, hubcluster_name in hub_data.items():
+                    if hubcluster_name:
+                        hubcluster_name = re.sub(r"\(.+\)", "", hubcluster_name)
+                    hub_site_id = sites_n2id.get(hub_site, hub_site)
+                    hubclusters_resp = sdk.get.hubclusters(hub_site_id)
+                    hubclusters_cache, _ = extract_items(hubclusters_resp, 'hubclusters')
+                    hubclusters_n2id = build_lookup_dict(hubclusters_cache)
+                    hubcluster_id = hubclusters_n2id.get(hubcluster_name)
+                    # Now that we have removed. We need to update the clusters with new values
+                    for hub_cluster in hubclusters_cache:
+                        hub_cluster_template = copy.deepcopy(hub_cluster)
+                        peer_sites = hub_cluster.get("peer_sites")
+                        new_peer_sites = copy.deepcopy(peer_sites)
+                        if peer_sites:
+                            if site_id not in peer_sites:
+                                if hubcluster_id == hub_cluster.get("id"):
+                                    new_peer_sites.append(site_id)
+                                    hub_cluster_template["peer_sites"] = new_peer_sites
+                                    resp = sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"),
+                                                               hub_cluster_template)
+                                    if not resp.cgx_status:
+                                        throw_error("Hubcluster update failed: ", resp)
+                                    output_message(
+                                        " Updated site '{0}' as part of cluster '{1}' for DC '{2}'".format(
+                                            config_site_name,
+                                            hubcluster_name,
+                                            hub_site))
+                                elif not hubcluster_id:
+                                    continue
+                        else:
+                            if not hubcluster_id:
+                                continue
+                            elif hubcluster_id == hub_cluster.get("id"):
+                                new_peer_sites.append(site_id)
+                                hub_cluster_template["peer_sites"] = new_peer_sites
+                                resp = sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"), hub_cluster_template)
+                                if not resp.cgx_status:
+                                    throw_error("Hubcluster update failed: ", resp)
+                                output_message(" Updated site '{0}' as part of cluster '{1}' for DC '{2}'".format(
+                                    config_site_name,
+                                    hubcluster_name,
+                                    hub_site))
+
             # -- Start WAN Interfaces
             waninterfaces_resp = sdk.get.waninterfaces(site_id)
             waninterfaces_cache, leftover_waninterfaces = extract_items(waninterfaces_resp, 'waninterfaces')
@@ -8513,93 +8599,6 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
                 leftover_hubclusters = [entry for entry in leftover_hubclusters if entry != hubcluster_id]
 
             # -- End HubClusters
-
-            # First get hubclusters... Second identify if hubcluster is changed.. third remove existing.. fourth update new
-            output_message(" Validating Hub Cluster binding")
-            for hub_data in config_bind_hubclusters:
-                for hub_site, hubcluster_name in hub_data.items():
-                    if hubcluster_name:
-                        hubcluster_name = re.sub(r"\(.+\)", "", hubcluster_name)
-                    hub_site_id = sites_n2id.get(hub_site, hub_site)
-                    hubclusters_resp = sdk.get.hubclusters(hub_site_id)
-                    hubclusters_cache, _ = extract_items(hubclusters_resp, 'hubclusters')
-                    hubclusters_n2id = build_lookup_dict(hubclusters_cache)
-                    hubcluster_id = None
-                    if hubcluster_name:
-                        if re.match(r"No cluster", hubcluster_name, re.I):
-                            hubcluster_id = None
-                        else:
-                            hubcluster_id = hubclusters_n2id.get(hubcluster_name)
-                            if not hubcluster_id:
-                                throw_error("Invalid hubcluster name '{0}' for DC '{1}'".format(hubcluster_name, hub_site))
-
-                    for hub_cluster in hubclusters_cache:
-                        hub_cluster_template = copy.deepcopy(hub_cluster)
-                        peer_sites = hub_cluster.get("peer_sites")
-                        new_peer_sites = copy.deepcopy(peer_sites)
-                        if peer_sites:
-                            if site_id in peer_sites:
-                                if hubcluster_id == hub_cluster.get("id"):
-                                    continue
-                                else:
-                                    new_peer_sites.remove(site_id)
-                                    hub_cluster_template["peer_sites"] = new_peer_sites
-                                    resp = sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"), hub_cluster_template)
-                                    if not resp.cgx_status:
-                                        throw_error("Hubcluster update failed: ", resp)
-                                    output_message(
-                                        " Updated site '{0}' as part of cluster '{1}' for DC '{2}'".format(
-                                            config_site_name,
-                                            hubcluster_name,
-                                            hub_site))
-
-            for hub_data in config_bind_hubclusters:
-                for hub_site, hubcluster_name in hub_data.items():
-                    if hubcluster_name:
-                        hubcluster_name = re.sub(r"\(.+\)", "", hubcluster_name)
-                    hub_site_id = sites_n2id.get(hub_site, hub_site)
-                    hubclusters_resp = sdk.get.hubclusters(hub_site_id)
-                    hubclusters_cache, _ = extract_items(hubclusters_resp, 'hubclusters')
-                    hubclusters_n2id = build_lookup_dict(hubclusters_cache)
-                    hubcluster_id = hubclusters_n2id.get(hubcluster_name)
-                    # Now that we have removed. We need to update the clusters with new values
-                    for hub_cluster in hubclusters_cache:
-                        hub_cluster_template = copy.deepcopy(hub_cluster)
-                        peer_sites = hub_cluster.get("peer_sites")
-                        new_peer_sites = copy.deepcopy(peer_sites)
-                        if peer_sites:
-                            if site_id in peer_sites:
-                                if hubcluster_id == hub_cluster.get("id"):
-                                    continue
-                                else:
-                                    new_peer_sites.remove(site_id)
-                                    hub_cluster_template["peer_sites"] = new_peer_sites
-                                    sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"), hub_cluster_template)
-                            else:
-                                if hubcluster_id == hub_cluster.get("id"):
-                                    new_peer_sites.append(site_id)
-                                    hub_cluster_template["peer_sites"] = new_peer_sites
-                                    resp = sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"), hub_cluster_template)
-                                    if not resp.cgx_status:
-                                        throw_error("Hubcluster update failed: ", resp)
-                                    output_message(
-                                        " Updated site '{0}' as part of cluster '{1}' for DC '{2}'".format(config_site_name,
-                                                                                                      hubcluster_name,
-                                                                                                      hub_site))
-                                elif not hubcluster_id:
-                                    continue
-                        else:
-                            if not hubcluster_id:
-                                continue
-                            elif hubcluster_id == hub_cluster.get("id"):
-                                new_peer_sites.append(site_id)
-                                hub_cluster_template["peer_sites"] = new_peer_sites
-                                resp = sdk.put.hubclusters(hub_site_id, hub_cluster.get("id"), hub_cluster_template)
-                                if not resp.cgx_status:
-                                    throw_error("Hubcluster update failed: ", resp)
-                                output_message(" Updated site '{0}' as part of cluster '{1}' for DC '{2}'".format(config_site_name,
-                                                                                                             hubcluster_name,
-                                                                                                             hub_site))
 
             # -- Start Site_extensions
             site_extensions_resp = sdk.get.site_extensions(site_id)
