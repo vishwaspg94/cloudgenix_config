@@ -8212,7 +8212,7 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
                             hubcluster_id = hubclusters_n2id.get(hubcluster_name)
                             if not hubcluster_id:
                                 throw_warning(
-                                    "Invalid hubcluster name '{0}' for DC '{1}'. Skipping..".format(hubcluster_name, hub_site))
+                                    "Hubcluster '{0}' not found at DC '{1}'. Skipping..".format(hubcluster_name, hub_site))
                                 continue
 
                     for hub_cluster in hubclusters_cache:
@@ -8231,10 +8231,8 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
                                     if not resp.cgx_status:
                                         throw_error("Hubcluster update failed: ", resp)
                                     output_message(
-                                        " Updated site '{0}' as part of cluster '{1}' for DC '{2}'".format(
-                                            config_site_name,
-                                            hubcluster_name,
-                                            hub_site))
+                                        " Hubcluster binding removed from DC '{0}' for site '{1}'".format(
+                                            hub_site, config_site_name))
 
             for hub_data in config_bind_hubclusters:
                 for hub_site, hubcluster_name in hub_data.items():
