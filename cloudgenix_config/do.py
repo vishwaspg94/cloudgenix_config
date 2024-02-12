@@ -8877,10 +8877,6 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
 
             config_deviceid_snmpdiscovery = parse_deviceid_config(config_deviceidconfigs)
 
-            deviceid_snmpdiscovery_version = use_sdk_yaml_version(config_deviceidconfigs, 'snmpdiscoverystartnodes',
-                                                           sdk.put.deviceidconfigs_snmpdiscoverystartnodes, default=[],
-                                                           sdk_or_yaml=apiversion)
-
             deviceidconfigs_resp = sdk.get.deviceidconfigs(site_id)
             deviceidconfigs_cache, leftover_deviceidconfigs = extract_items(
                 deviceidconfigs_resp, 'deviceidconfigs')
@@ -8893,6 +8889,12 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
                     config_deviceidconfigs_record = config_deviceidconfigs_template[0]
                 else:
                     config_deviceidconfigs_record = config_deviceidconfigs_template
+
+                deviceid_snmpdiscovery_version = use_sdk_yaml_version(config_deviceidconfigs_record,
+                                                                      'snmpdiscoverystartnodes',
+                                                                      sdk.put.deviceidconfigs_snmpdiscoverystartnodes,
+                                                                      default=[],
+                                                                      sdk_or_yaml=apiversion)
 
                 config_deviceidconfigs_record = fuzzy_pop(config_deviceidconfigs_record, 'snmpdiscoverystartnodes')
                 deviceidconfigs_id = None
