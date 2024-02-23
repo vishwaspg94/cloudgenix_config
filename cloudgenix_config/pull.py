@@ -886,24 +886,28 @@ def _pull_config_for_single_site(site_name_id):
     delete_if_empty(site, HUBCLUSTER_CONFIG_STR)
 
     site[BIND_HUBCLUSTER_CONFIG_STR] = []
-    for site_h in SITES:
-        if site_h.get("element_cluster_role") == "HUB":
-            response = sdk.get.hubclusters(site_h['id'])
-            if not response.cgx_status:
-                throw_error("Hub Clusters get failed: ", response)
-            hubclusters = response.cgx_content['items']
-            association_dict = {}
-            for hubcluster in hubclusters:
-                if hubcluster.get("peer_sites") and site["id"] in hubcluster["peer_sites"]:
-                    default = ""
-                    if hubcluster.get("default_cluster"):
-                        default = "(default)"
-                    association_dict = {site_h.get("name", site_h['id']): hubcluster.get("name", hubcluster["id"]) + default}
-                    break
-            if not association_dict:
-                association_dict = {site_h.get("name", site_h['id']): None}
+    if site.get("element_cluster_role") != "HUB":
+        for site_h in SITES:
+            if site_h.get("element_cluster_role") == "HUB":
+                response = sdk.get.hubclusters(site_h['id'])
+                if not response.cgx_status:
+                    throw_error("Hub Clusters get failed: ", response)
+                hubclusters = response.cgx_content['items']
+                association_dict = {}
+                for hubcluster in hubclusters:
+                    if hubcluster.get("peer_sites") and site["id"] in hubcluster["peer_sites"]:
+                        default = ""
+                        if hubcluster.get("default_cluster"):
+                            default = "(default)"
+                        association_dict = {
+                            site_h.get("name", site_h['id']): hubcluster.get("name", hubcluster["id"]) + default}
+                        break
+                if not association_dict:
+                    association_dict = {site_h.get("name", site_h['id']): None}
 
-            site[BIND_HUBCLUSTER_CONFIG_STR].append(association_dict)
+                site[BIND_HUBCLUSTER_CONFIG_STR].append(association_dict)
+    delete_if_empty(site, BIND_HUBCLUSTER_CONFIG_STR)
+
     # Get Spoke Clusters
     dup_name_dict = {}
     site[SPOKECLUSTER_CONFIG_STR] = {}
