@@ -8248,6 +8248,8 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
                         hub_cluster_template = copy.deepcopy(hub_cluster)
                         peer_sites = hub_cluster.get("peer_sites")
                         new_peer_sites = copy.deepcopy(peer_sites)
+                        if not new_peer_sites:
+                            new_peer_sites = []
                         if peer_sites:
                             if site_id not in peer_sites:
                                 if hubcluster_id == hub_cluster.get("id"):
