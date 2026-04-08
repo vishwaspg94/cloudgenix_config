@@ -33,6 +33,8 @@ import copy
 import sys
 import re
 import inspect
+import math
+import time
 
 # CloudGenix SDK should have been checked present by other imports.
 from cloudgenix import jdout, jdout_detailed
@@ -406,6 +408,73 @@ def extract_items(resp_object, error_label=None, id_key='id'):
         else:
             throw_error("Unable to cache response.".format(error_label), resp_object)
             return [], []
+
+
+def paginated_query(query_func, error_label, max_retries=5, initial_backoff=1):
+    """
+    Execute a paginated query to fetch all items with retry logic for rate limiting.
+    :param query_func: SDK query function to call (e.g., sdk.post.elements_query)
+    :param error_label: Label for error messages
+    :param max_retries: Maximum number of retries for 429 errors (default: 5)
+    :param initial_backoff: Initial backoff time in seconds (default: 1)
+    :return: List of all items from all pages
+    """
+    def query_with_retry(query_body, page_num):
+        """Execute query with exponential backoff for 429 errors."""
+        retries = 0
+        backoff = initial_backoff
+
+        while retries <= max_retries:
+            resp = query_func(query_body)
+
+            # Check for 429 rate limit error
+            if hasattr(resp, 'status_code') and resp.status_code == 429:
+                if retries < max_retries:
+                    wait_time = backoff * (2 ** retries)
+                    print("Rate limit hit (429) on {} page {}. Retrying in {} seconds...".format(
+                        error_label, page_num, wait_time))
+                    time.sleep(wait_time)
+                    retries += 1
+                    continue
+                else:
+                    throw_error("{} query failed after {} retries (rate limit): ".format(
+                        error_label, max_retries), resp)
+
+            # Check for other errors
+            if not resp.cgx_status:
+                throw_error("{} query failed: ".format(error_label), resp)
+
+            return resp
+
+        return None
+
+    items_cache = []
+    limit = 200
+    query_body = {
+        "dest_page": 0,
+        "limit": limit,
+        "getDeleted": False
+    }
+
+    # Get first page to determine total count
+    resp = query_with_retry(query_body, 0)
+
+    total_count = resp.cgx_content.get('total_count', 0)
+    items_page, _ = extract_items(resp, error_label)
+    if items_page:
+        items_cache.extend(items_page)
+
+    # Calculate total pages and fetch remaining pages
+    total_pages = math.ceil(total_count / limit) if total_count > 0 else 1
+
+    for page in range(1, total_pages):
+        query_body["dest_page"] = page
+        resp = query_with_retry(query_body, page)
+        items_page, _ = extract_items(resp, error_label)
+        if items_page:
+            items_cache.extend(items_page)
+
+    return items_cache
 
 
 def build_lookup_dict(list_content, key_val='name', value_val='id', force_nag=False, model_name=None):

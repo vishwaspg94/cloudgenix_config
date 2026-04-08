@@ -39,6 +39,8 @@ import copy
 import datetime
 import logging
 import errno
+import math
+import time
 
 
 # CloudGenix Python SDK
@@ -54,11 +56,11 @@ except ImportError as e:
 # import module specific
 try:
     from cloudgenix_config import throw_error, throw_warning, name_lookup_in_template, extract_items, build_lookup_dict, \
-    check_name, nameable_interface_types, skip_interface_list, get_function_default_args
+    check_name, nameable_interface_types, skip_interface_list, get_function_default_args, paginated_query
     from cloudgenix_config import __version__ as import_cloudgenix_config_version
 except Exception:
     from cloudgenix_config.cloudgenix_config import throw_error, throw_warning, name_lookup_in_template, extract_items, build_lookup_dict, \
-    check_name, nameable_interface_types, skip_interface_list, get_function_default_args
+    check_name, nameable_interface_types, skip_interface_list, get_function_default_args, paginated_query
     from cloudgenix_config.cloudgenix_config import __version__ as import_cloudgenix_config_version
 
 # Check config file, in cwd.
@@ -339,13 +341,11 @@ def update_global_cache():
     sites_resp = sdk.get.sites()
     sites_cache, _ = extract_items(sites_resp, 'sites')
 
-    # elements
-    elements_resp = sdk.get.elements()
-    elements_cache, _ = extract_items(elements_resp, 'elements')
+    # elements - paginated query
+    elements_cache = paginated_query(sdk.post.elements_query, 'elements')
 
-    # machines
-    machines_resp = sdk.get.machines()
-    machines_cache, _ = extract_items(machines_resp, 'machines')
+    # machines - paginated query
+    machines_cache = paginated_query(sdk.post.machines_query, 'machines')
 
     # policysets
     policysets_resp = sdk.get.policysets()
@@ -1057,9 +1057,15 @@ def _pull_config_for_single_site(site_name_id):
     # Get Elements
     site[ELEMENTS_STR] = {}
     dup_name_dict_elements = {}
-    for element in ELEMENTS:
-        if element['site_id'] != site['id']:
+    for elem in ELEMENTS:
+        if elem['site_id'] != site['id']:
             continue
+
+        # Get the specific element details
+        element_resp = sdk.get.elements(elem['id'])
+        if not element_resp.cgx_status:
+            throw_error("Element get failed: ", element_resp)
+        element = element_resp.cgx_content
 
         if element.get('cluster_id'):
             element['cluster_id'] = id_name_cache.get(element['cluster_id'])

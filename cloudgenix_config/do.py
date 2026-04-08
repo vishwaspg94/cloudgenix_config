@@ -59,7 +59,7 @@ try:
         list_to_named_key_value, recombine_named_key_value, get_default_ifconfig_from_model_string, \
         order_interface_by_number, get_member_default_config, default_backwards_bypasspairs, find_diff, \
         nameable_interface_types, skip_interface_list, check_default_ipv4_config, use_sdk_yaml_version, \
-        get_function_default_args, CloudGenixConfigError
+        get_function_default_args, CloudGenixConfigError, paginated_query
 
     from cloudgenix_config import __version__ as import_cloudgenix_config_version
 except Exception:
@@ -68,7 +68,7 @@ except Exception:
         list_to_named_key_value, recombine_named_key_value, get_default_ifconfig_from_model_string, \
         order_interface_by_number, get_member_default_config, default_backwards_bypasspairs, find_diff, \
         nameable_interface_types, skip_interface_list, check_default_ipv4_config, use_sdk_yaml_version, \
-        get_function_default_args, CloudGenixConfigError
+        get_function_default_args, CloudGenixConfigError, paginated_query
 
     from cloudgenix_config.cloudgenix_config import __version__ as import_cloudgenix_config_version
 
@@ -168,7 +168,9 @@ element_put_items = [
     "switch_config",
     "device_profile_id",
     "main_power_usage_threshold",
-    "led_config"
+    "led_config",
+    "hub_cluster_config",
+    "tenant_id"
 ]
 
 createable_interface_types = [
@@ -560,13 +562,11 @@ def update_global_cache():
     sites_resp = sdk.get.sites()
     sites_cache, _ = extract_items(sites_resp, 'sites')
 
-    # elements
-    elements_resp = sdk.get.elements()
-    elements_cache, _ = extract_items(elements_resp, 'elements')
+    # elements - paginated query
+    elements_cache = paginated_query(sdk.post.elements_query, 'elements')
 
-    # machines
-    machines_resp = sdk.get.machines()
-    machines_cache, _ = extract_items(machines_resp, 'machines')
+    # machines - paginated query
+    machines_cache = paginated_query(sdk.post.machines_query, 'machines')
 
     # policysets
     policysets_resp = sdk.get.policysets()
@@ -840,13 +840,11 @@ def update_element_machine_cache():
     global elements_byserial
     global machines_byserial
 
-    # elements
-    elements_resp = sdk.get.elements()
-    elements_cache, _ = extract_items(elements_resp, 'elements')
+    # elements - paginated query
+    elements_cache = paginated_query(sdk.post.elements_query, 'elements')
 
-    # machines
-    machines_resp = sdk.get.machines()
-    machines_cache, _ = extract_items(machines_resp, 'machines')
+    # machines - paginated query
+    machines_cache = paginated_query(sdk.post.machines_query, 'machines')
 
     # element name
     elements_n2id = build_lookup_dict(elements_cache)
@@ -1932,6 +1930,7 @@ def assign_modify_element(matching_element, site_id, config_element, hubclusters
             #print("ELEMENT DIFF: {0}".format(find_diff(element_change_check, elem_template)))
             output_message("  Updating Element {0}.".format(element_descriptive_text))
 
+            print("Before:", elem_template)
             # clean up element template.
             for key in copy.deepcopy(elem_template).keys():
                 if key not in element_put_items:
@@ -1939,7 +1938,7 @@ def assign_modify_element(matching_element, site_id, config_element, hubclusters
 
             # Add missing elem attributes
             elem_template['sw_obj'] = None
-
+            print("AFTER:", elem_template)
             local_debug("ELEM_TEMPLATE_FINAL: " + str(json.dumps(elem_template, indent=4)))
 
             # Fetch the current etag.
@@ -8936,7 +8935,7 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
                                   wait_interval=interval_timeout)
 
                     # refresh elements cache before detect.
-                    update_element_machine_cache()
+                    # update_element_machine_cache()
                     config_serial, matching_element, matching_machine, matching_model = detect_elements(config_element)
 
                 # wait for claim to finish,
@@ -8952,7 +8951,7 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
                                 wait_interval=interval_timeout)
 
                 # Have to refresh cache here, due to the fact that element _etag may change during upgrade.
-                update_element_machine_cache()
+                # update_element_machine_cache()
                 config_serial, matching_element, matching_machine, matching_model = detect_elements(config_element)
 
                 element = matching_element
@@ -9023,7 +9022,7 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
                             wait_time_elapsed += 10
 
                 # update element and machine cache before moving on.
-                update_element_machine_cache()
+                # update_element_machine_cache()
                 config_serial, matching_element, matching_machine, matching_model = detect_elements(config_element)
 
                 # final element ID and model for this element:
@@ -10827,7 +10826,7 @@ def do_site(loaded_config, destroy, declaim=False, passed_sdk=None, passed_timeo
                                         hubclusters_n2id, waninterfaces_n2id, version=elements_version)
 
                 # update element and machine cache before moving on.
-                update_element_machine_cache()
+                # update_element_machine_cache()
                 config_serial, matching_element, matching_machine, matching_model = detect_elements(config_element)
 
                 # final element ID and model for this element:
